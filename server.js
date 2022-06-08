@@ -1,109 +1,96 @@
 const express = require('express');
-const bodyParser = require('body-parser'); // latest version of exressJS now comes with Body-Parser!
-const bcrypt = require('bcrypt-nodejs');
-const cors = require('cors');
-const knex = require('knex')
-
-const db = knex({
-  // Enter your own database information here based on what you created
-  client: 'pg',
-  connection: {
-    host : '127.0.0.1',
-    user : 'aneagoie',
-    password : '',
-    database : 'smart-brain'
-  }
-});
-
+const bodyParser = require('body-parser')
 const app = express();
 
-app.use(cors())
-app.use(express.json()); // latest version of exressJS now comes with Body-Parser!
+/***********MIDDLEWARE*************/
+app.use(bodyParser.json())
 
+const database = {
+  users: [
+    {
+      id: '123',
+      name: 'Gar',
+      email: 'gar@email.com',
+      password: 'Garfield',
+      entries: 0,
+      joined: new Date ()
+    },
+    {
+      id: '124',
+      name: 'Rick',
+      email: 'rick@email.com',
+      password: 'Rick James',
+      entries: 0,
+      joined: new Date ()
+    }
+  ]
+}
 
-app.get('/', (req, res)=> {
-  res.send(database.users);
+app.get('/', (req, res)=>{
+  res.send(database.users)
 })
 
 app.post('/signin', (req, res) => {
-  db.select('email', 'hash').from('login')
-    .where('email', '=', req.body.email)
-    .then(data => {
-      const isValid = bcrypt.compareSync(req.body.password, data[0].hash);
-      if (isValid) {
-        return db.select('*').from('users')
-          .where('email', '=', req.body.email)
-          .then(user => {
-            res.json(user[0])
-          })
-          .catch(err => res.status(400).json('unable to get user'))
-      } else {
-        res.status(400).json('wrong credentials')
-      }
-    })
-    .catch(err => res.status(400).json('wrong credentials'))
+  //I had an error with the post json
+  // console.log(database.users[0].email, "🥷🏼\n")
+  // console.log(req.body.email, "🔥\n")
+  if (req.body.email === database.users[0].email && 
+      req.body.password === database.users[0].password){
+        res.send('sign in is successful')
+  } else {
+    res.status(400).json('Error logging in');
+  }
 })
-
 app.post('/register', (req, res) => {
   const { email, name, password } = req.body;
-  const hash = bcrypt.hashSync(password);
-    db.transaction(trx => {
-      trx.insert({
-        hash: hash,
-        email: email
-      })
-      .into('login')
-      .returning('email')
-      .then(loginEmail => {
-        return trx('users')
-          .returning('*')
-          .insert({
-            // If you are using knex.js version 1.0.0 or higher this now returns an array of objects. Therefore, the code goes from:
-            // loginEmail[0] --> this used to return the email
-            // TO
-            // loginEmail[0].email --> this now returns the email
-            email: loginEmail[0].email,
-            name: name,
-            joined: new Date()
-          })
-          .then(user => {
-            res.json(user[0]);
-          })
-      })
-      .then(trx.commit)
-      .catch(trx.rollback)
-    })
-    .catch(err => res.status(400).json('unable to register'))
-})
+  database.users.push({
+    id: '125',
+    name: name,
+    email: email,
+    password: password,
+    entries: 0,
+    joined: new Date ()
+  })
+  res.json(database.users[database.users.length-1])
 
-app.get('/profile/:id', (req, res) => {
+})
+app.get('/profile/:id', (req, res)=> {
   const { id } = req.params;
-  db.select('*').from('users').where({id})
-    .then(user => {
-      if (user.length) {
-        res.json(user[0])
-      } else {
-        res.status(400).json('Not found')
-      }
-    })
-    .catch(err => res.status(400).json('error getting user'))
+  let found = false;
+  database.users.forEach(user => {
+    if (user.id === id)  {
+      found = true;
+      return res.json(user);
+    } 
+  })
+  if (!found) {
+    res.status(400).json('not found')
+  }
 })
 
 app.put('/image', (req, res) => {
   const { id } = req.body;
-  db('users').where('id', '=', id)
-  .increment('entries', 1)
-  .returning('entries')
-  .then(entries => {
-    // If you are using knex.js version 1.0.0 or higher this now returns an array of objects. Therefore, the code goes from:
-    // entries[0] --> this used to return the entries
-    // TO
-    // entries[0].entries --> this now returns the entries
-    res.json(entries[0].entries);
+  let found = false;
+  database.users.forEach(user => {
+    if (user.id === id)  {
+      found = true;
+      user.entries++
+      return res.json(user.entries);
+    } 
   })
-  .catch(err => res.status(400).json('unable to get entries'))
+  if (!found) {
+    res.status(400).json('not found')
+  }
 })
 
 app.listen(3000, ()=> {
-  console.log('app is running on port 3000');
+  console.log('app is running on port 3000')
 })
+
+/*
+/sign in --> POST = success/fail
+/register --> POST = user
+/profile/:userId --> GET = user 
+/image --> Put --> user
+/
+*/
